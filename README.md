@@ -1,4 +1,5 @@
-# pes6stat
-Pro Evolution Soccer 6 match statistic
+# PES6-RPC
+Pro Evolution Soccer 6 live stats as a Discord Rich Presence.
 
-After end of match generate json file in folder stats. Works good but need refactor
+Based on code by diozdeath19, this app can display live info directly on your Discord profile - perfect for online communities of the game.
+May the best football game ever never die!
