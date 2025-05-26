@@ -1,23 +1,34 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include "windows.h"
 #include <tlhelp32.h>
 #include <tchar.h>
 #include <atlstr.h>
 #include <signal.h>
 #include <ctime>
-#include "json/json.h"
-#include "json/json-forwards.h"
+
+// deprecation warnings
+#define _CRT_SECURE_NO_WARNINGS
 
 using namespace std;
-#define MAX_OF_PLAYED_PLAYERS 18;
-#define MAX_OF_ROSTER_PLAYERS 32;
-#define NOT_PLAYED -1;
-#define VERSION_APP "1.4";
-#define HALF_1 0;
-#define HALF_2 1;
-#define EX_HALF_1 2;
-#define EX_HALF_2 3;
+#define MAX_OF_PLAYED_PLAYERS 18
+#define MAX_OF_ROSTER_PLAYERS 32
+#define NOT_PLAYED -1
+#define VERSION_APP "1.4"
+#define HALF_1 0
+#define HALF_2 1
+#define EX_HALF_1 2
+#define EX_HALF_2 3
+
+
+inline LPCVOID ToAddress(DWORD addr) {
+	#ifdef _WIN64
+		return reinterpret_cast<LPCVOID>(static_cast<DWORD64>(addr));
+	#else
+		return reinterpret_cast<LPCVOID>(addr);
+	#endif
+}
 
 HANDLE OpenProcessByName(LPCTSTR name, DWORD dwAccess);
 void setPlayersStats(HANDLE pHandle, DWORD baseAddr, int* arr, int* playedPlayers);
@@ -77,7 +88,7 @@ int teamGuestPenaltiesScore = 0;
 string matchStartTime;
 char* teamNameHome = new char[50];
 char* teamNameGuest = new char[50];
-wstringstream fileName;
+stringstream fileName;
 BOOL isTeamPlayersReaded = false;
 int matchMinute;
 int matchStady;
@@ -135,7 +146,7 @@ int main(int argc, char** argv) {
 
 
 	USES_CONVERSION;
-	_tcscpy(gameName, A2T("PESWay.exe"));
+	_tcscpy(gameName, A2T("pes6.exe"));
 
 	pHandle = OpenProcessByName(gameName, PROCESS_VM_READ);
 	if (pHandle == INVALID_HANDLE_VALUE || pHandle == NULL) {
@@ -145,31 +156,31 @@ int main(int argc, char** argv) {
 	}
 	cout << "Process opened!" << endl;
 
-	WCHAR gameDir[MAX_PATH] = { 0 };
-	GetModuleFileName(NULL, gameDir, MAX_PATH);
-	PathRemoveFileSpec(gameDir);
+	char gameDir[MAX_PATH] = { 0 };
+	GetModuleFileNameA(NULL, gameDir, MAX_PATH);
+	PathRemoveFileSpecA(gameDir);
 
-	wstringstream ss;
-	ss << gameDir << L"\\stats\\";
+	stringstream ss;
+	ss << gameDir << "\\stats\\";
 
-	const wstring dir = ss.str();
+	const string dir = ss.str();
 
-	int result = CreateDirectory(dir.c_str(), NULL);
+	int result = CreateDirectoryA(dir.c_str(), NULL);
 	if (result == 0 && GetLastError() != ERROR_ALREADY_EXISTS) {
 		cout << "Error when create folder: code " << GetLastError() << endl;
 		return -1;
 	}
 
-	ss << L"\\log\\";
-	wstring logPath = ss.str();
-	result = CreateDirectory(logPath.c_str(), NULL);
+	ss << "\\log\\";
+	string logPath = ss.str();
+	result = CreateDirectoryA(logPath.c_str(), NULL);
 	if (result == 0 && GetLastError() != ERROR_ALREADY_EXISTS) {
 		cout << "Error when create folder: code " << GetLastError() << endl;
 		return -1;
 	}
 
-	ss.str(L"");
-	ss << logPath << L"log_" << currentDateTime().c_str();
+	ss.str("");
+	ss << logPath << "log_" << currentDateTime().c_str();
 	out.open(ss.str(), std::ofstream::out | std::ofstream::app);
 
 	BOOL allowReading = true;
@@ -234,8 +245,8 @@ int main(int argc, char** argv) {
 		cout << "Match minute " << matchMinute << endl;
 		out << "Match minute " << matchMinute << endl;
 
-		cout << "Match stady " << matchStady << endl;
-		out << "Match stady " << matchStady << endl;
+		cout << "Match half " << matchStady << endl;
+		out << "Match half " << matchStady << endl;
 
 		setTeamName(pHandle, teamNameHomeAddr, teamNameHome);
 		setTeamName(pHandle, teamNameGuestAddr, teamNameGuest);
@@ -304,11 +315,11 @@ int main(int argc, char** argv) {
 		setPlayersInjuries(pHandle, playersGuestInjuriesAddr, playersGuestInjuries, playedPlayersGuest);
 
 		setRealPlayerName(pHandle, realPlayerHomeNicknameAddr, &realPlayerHomeNickName);
-		cout << "Home: " << realPlayerHomeNickName << endl;
+		cout << "Home: " << teamHomeScore << endl;
 		setRealPlayerName(pHandle, realPlayerGuestNicknameAddr, &realPlayerGuestNickName);
-		cout << "Guest: " << realPlayerGuestNickName << endl;
+		cout << "Guest: " << teamGuestScore << endl;
 
-		fileName.str(L"");
+		fileName.str("");
 		fileName.clear();
 		if (realPlayerHomeNickName != string("") && realPlayerGuestNickName != string("")) {
 			fileName << dir << string(teamNameHome).c_str() << " (" << realPlayerHomeNickName.c_str() << ")" << " - " << string(teamNameGuest).c_str() << " (" << realPlayerGuestNickName.c_str() << ") " << matchStartTime.c_str() << ".dat";
@@ -316,12 +327,12 @@ int main(int argc, char** argv) {
 			fileName << dir << string(teamNameHome).c_str() << " - " << string(teamNameGuest).c_str() << " " << matchStartTime.c_str() << ".dat";
 		}
 		
-		cout << "Record match " << string(teamNameHome) << " - " << string(teamNameGuest) << " " << matchStartTime << endl;
-		out << "Record match " << string(teamNameHome) << " - " << string(teamNameGuest) << " " << matchStartTime << endl;
+		cout << "Current match " << string(teamNameHome) << " - " << string(teamNameGuest) << " " << matchStartTime << endl;
+		out << "Current match " << string(teamNameHome) << " - " << string(teamNameGuest) << " " << matchStartTime << endl;
 		out << "Home real player: " << realPlayerHomeNickName;
 		out << "Guest real player: " << realPlayerGuestNickName;
 
-		// This values updates only after halftime
+		// only after halftime
 		if (matchStady > 0) {
 			setPlayersDribbleDistances(pHandle, playersHomeDribbleDistancesAddr, playersHomeDribbleDistances, playedPlayersHome);
 			setPlayersDribbleDistances(pHandle, playersGuestDribbleDistancesAddr, playersGuestDribbleDistances, playedPlayersGuest);
@@ -351,236 +362,6 @@ int main(int argc, char** argv) {
 }
 
 void createFileWithStats() {
-	Json::Value root;
-	Json::StyledWriter styledWriter;
-	Json::Value playedPlayers;
-	int maxOfPlayedPlayers = MAX_OF_PLAYED_PLAYERS;
-	int notPlayed = NOT_PLAYED;
-
-	root["home"]["team"] = string(teamNameHome);
-	root["guest"]["team"] = string(teamNameGuest);
-	root["home"]["score"] = teamHomeScore;
-	if (teamHomePenaltiesScore != 0 || teamGuestPenaltiesScore != 0) {
-		root["home"]["penaltiesScore"] = teamHomePenaltiesScore;
-		root["guest"]["penaltiesScore"] = teamGuestPenaltiesScore;
-	}
-	if (matchStady > 1) {
-		root["home"]["extraTimeScore"] = teamHomeEXScore;
-		root["guest"]["extraTimeScore"] = teamGuestEXScore;
-	}
-	root["guest"]["score"] = teamGuestScore;
-	root["minutesPlayed"] = matchMinute;
-	root["version"] = VERSION_APP;
-
-	std::stringstream ss;
-
-	for (int i = 0; i < maxOfPlayedPlayers; i++) {
-		if (playedPlayersHome[i] != notPlayed) {
-			root["home"]["playedPlayersPos"][i] = playedPlayersHome[i];
-			root["home"]["playedPlayersIds"][i] = playersHome[playedPlayersHome[i]];
-			root["home"]["playedPlayersNames"][i] = playersHomeNames[playedPlayersHome[i]];
-		}
-		if (playedPlayersGuest[i] != notPlayed) {
-			root["guest"]["playedPlayersPos"][i] = playedPlayersGuest[i];
-			root["guest"]["playedPlayersIds"][i] = playersGuest[playedPlayersGuest[i]];
-			root["guest"]["playedPlayersNames"][i] = playersGuestNames[playedPlayersGuest[i]];
-		}
-	}
-	
-	for (int i = 0; i < 32; i++) {		
-		if (playersHomeGoals[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["goals"][ss.str()] = playersHomeGoals[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-			
-		if (playersHomeAssists[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["assists"][ss.str()] = playersHomeAssists[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeYellowCards[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["yellowCards"][ss.str()] = playersHomeYellowCards[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeRedCards[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["redCards"][ss.str()] = playersHomeRedCards[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeDribbleDistances[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["dribbleDistances"][ss.str()] = playersHomeDribbleDistances[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeFouls[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["fouls"][ss.str()] = playersHomeFouls[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeIntercepts[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["intercepts"][ss.str()] = playersHomeIntercepts[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeClearedPasses[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["clearedPasses"][ss.str()] = playersHomeClearedPasses[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomePossessionOfBall[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["possessionOfBall"][ss.str()] = playersHomePossessionOfBall[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeInjuries[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["injuries"][ss.str()] = playersHomeInjuries[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeTotalShots[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["totalShots"][ss.str()] = playersHomeTotalShots[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersHomeShotsOnTarget[i] != 0) {
-			ss << playersHome[playedPlayersHome[i]];
-			//ss << playersHomeNames[playedPlayersHome[i]];
-			root["home"]["shotsOnTarget"][ss.str()] = playersHomeShotsOnTarget[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-			
-		if (playersGuestGoals[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["goals"][ss.str()] = playersGuestGoals[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-			
-		if (playersGuestAssists[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["assists"][ss.str()] = playersGuestAssists[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestYellowCards[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["yellowCards"][ss.str()] = playersGuestYellowCards[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestRedCards[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["redCards"][ss.str()] = playersGuestRedCards[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestDribbleDistances[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["dribbleDistances"][ss.str()] = playersGuestDribbleDistances[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestFouls[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["fouls"][ss.str()] = playersGuestFouls[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestIntercepts[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["intercepts"][ss.str()] = playersGuestIntercepts[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestClearedPasses[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["clearedPasses"][ss.str()] = playersGuestClearedPasses[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestPossessionOfBall[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["possessionOfBall"][ss.str()] = playersGuestPossessionOfBall[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestInjuries[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["injuries"][ss.str()] = playersGuestInjuries[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestTotalShots[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["totalShots"][ss.str()] = playersGuestTotalShots[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-
-		if (playersGuestShotsOnTarget[i] != 0) {
-			ss << playersGuest[playedPlayersGuest[i]];
-			//ss << playersGuestNames[playedPlayersGuest[i]];
-			root["guest"]["shotsOnTarget"][ss.str()] = playersGuestShotsOnTarget[i];
-			ss.str(std::string());
-			ss.clear();
-		}
-	}
-	
 	std::ofstream out;
 	out.open(fileName.str());
 	if (out.fail()) {
@@ -588,10 +369,85 @@ void createFileWithStats() {
 		out << "open failure : " << endl;
 		return;
 	}
-	out << styledWriter.write(root) << endl;
+
+	// match info
+	out << "Match Statistics" << endl;
+	out << "================" << endl;
+	out << "Date: " << matchStartTime << endl << endl;
+
+	// Teams
+	out << "Teams" << endl;
+	out << "-----" << endl;
+	out << "Home: " << teamNameHome << " Score: " << teamHomeScore;
+	if (teamHomePenaltiesScore != 0 || teamGuestPenaltiesScore != 0) {
+		out << " (Penalties: " << teamHomePenaltiesScore << ")";
+	}
+	if (matchStady > 1) {
+		out << " (Extra Time: " << teamHomeEXScore << ")";
+	}
+	out << endl;
+
+	out << "Away: " << teamNameGuest << " Score: " << teamGuestScore;
+	if (teamHomePenaltiesScore != 0 || teamGuestPenaltiesScore != 0) {
+		out << " (Penalties: " << teamGuestPenaltiesScore << ")";
+	}
+	if (matchStady > 1) {
+		out << " (Extra Time: " << teamGuestEXScore << ")";
+	}
+	out << endl << endl;
+
+	out << "Minutes Played: " << matchMinute << endl;
+	out << "Version: " << VERSION_APP << endl << endl;
+
+	// Players
+	out << "Home Team Players" << endl;
+	out << "----------------" << endl;
+	int maxOfPlayedPlayers = MAX_OF_PLAYED_PLAYERS;
+	int notPlayed = NOT_PLAYED;
+
+	for (int i = 0; i < maxOfPlayedPlayers; i++) {
+		if (playedPlayersHome[i] != notPlayed) {
+			out << "Player " << playersHome[playedPlayersHome[i]] << " (" << playersHomeNames[playedPlayersHome[i]] << ")" << endl;
+			if (playersHomeGoals[i] > 0) out << "  Goals: " << playersHomeGoals[i] << endl;
+			if (playersHomeAssists[i] > 0) out << "  Assists: " << playersHomeAssists[i] << endl;
+			if (playersHomeYellowCards[i] > 0) out << "  Yellow Cards: " << playersHomeYellowCards[i] << endl;
+			if (playersHomeRedCards[i] > 0) out << "  Red Cards: " << playersHomeRedCards[i] << endl;
+			if (playersHomeDribbleDistances[i] > 0) out << "  Dribble Distance: " << playersHomeDribbleDistances[i] << endl;
+			if (playersHomeFouls[i] > 0) out << "  Fouls: " << playersHomeFouls[i] << endl;
+			if (playersHomeIntercepts[i] > 0) out << "  Intercepts: " << playersHomeIntercepts[i] << endl;
+			if (playersHomeClearedPasses[i] > 0) out << "  Cleared Passes: " << playersHomeClearedPasses[i] << endl;
+			if (playersHomePossessionOfBall[i] > 0) out << "  Possession: " << playersHomePossessionOfBall[i] << endl;
+			if (playersHomeInjuries[i] > 0) out << "  Injury Level: " << playersHomeInjuries[i] << endl;
+			if (playersHomeTotalShots[i] > 0) out << "  Total Shots: " << playersHomeTotalShots[i] << endl;
+			if (playersHomeShotsOnTarget[i] > 0) out << "  Shots on Target: " << playersHomeShotsOnTarget[i] << endl;
+			out << endl;
+		}
+	}
+
+	out << endl << "Away Team Players" << endl;
+	out << "----------------" << endl;
+	for (int i = 0; i < maxOfPlayedPlayers; i++) {
+		if (playedPlayersGuest[i] != notPlayed) {
+			out << "Player " << playersGuest[playedPlayersGuest[i]] << " (" << playersGuestNames[playedPlayersGuest[i]] << ")" << endl;
+			if (playersGuestGoals[i] > 0) out << "  Goals: " << playersGuestGoals[i] << endl;
+			if (playersGuestAssists[i] > 0) out << "  Assists: " << playersGuestAssists[i] << endl;
+			if (playersGuestYellowCards[i] > 0) out << "  Yellow Cards: " << playersGuestYellowCards[i] << endl;
+			if (playersGuestRedCards[i] > 0) out << "  Red Cards: " << playersGuestRedCards[i] << endl;
+			if (playersGuestDribbleDistances[i] > 0) out << "  Dribble Distance: " << playersGuestDribbleDistances[i] << endl;
+			if (playersGuestFouls[i] > 0) out << "  Fouls: " << playersGuestFouls[i] << endl;
+			if (playersGuestIntercepts[i] > 0) out << "  Intercepts: " << playersGuestIntercepts[i] << endl;
+			if (playersGuestClearedPasses[i] > 0) out << "  Cleared Passes: " << playersGuestClearedPasses[i] << endl;
+			if (playersGuestPossessionOfBall[i] > 0) out << "  Possession: " << playersGuestPossessionOfBall[i] << endl;
+			if (playersGuestInjuries[i] > 0) out << "  Injury Level: " << playersGuestInjuries[i] << endl;
+			if (playersGuestTotalShots[i] > 0) out << "  Total Shots: " << playersGuestTotalShots[i] << endl;
+			if (playersGuestShotsOnTarget[i] > 0) out << "  Shots on Target: " << playersGuestShotsOnTarget[i] << endl;
+			out << endl;
+		}
+	}
+
 	out.close();
-	cout << "Successfully create file" << endl;
-	out << "Successfully create file" << endl;
+	// cout << "Successfully create file" << endl;
+	// out << "Successfully create file" << endl;
 }
 
 void setPlayersStats(HANDLE pHandle, DWORD baseAddr, int* arr, int* playedPlayers) {
@@ -605,7 +461,7 @@ void setPlayersStats(HANDLE pHandle, DWORD baseAddr, int* arr, int* playedPlayer
 			continue;
 		}
 		addr = baseAddr + i * offset;
-		if (!ReadProcessMemory(pHandle, (LPCVOID)addr, &val, 1, NULL)) {
+		if (!ReadProcessMemory(pHandle, ToAddress(addr), &val, 1, NULL)) {
 			cout << "Error by reading players stats - code : " << GetLastError() << endl;
 			out << "Error by reading players stats - code : " << GetLastError() << endl;
 			return;
@@ -615,7 +471,7 @@ void setPlayersStats(HANDLE pHandle, DWORD baseAddr, int* arr, int* playedPlayer
 }
 
 void setTeamName(HANDLE pHandle, DWORD addr, char* name) {
-	if (!ReadProcessMemory(pHandle, (LPCVOID)addr, name, 50, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(addr), name, 50, NULL)) {
 		cout << "Error by reading team name - code : " << GetLastError() << endl;
 		out << "Error by reading team name - code : " << GetLastError() << endl;
 	}
@@ -623,7 +479,7 @@ void setTeamName(HANDLE pHandle, DWORD addr, char* name) {
 
 void setRealPlayerName(HANDLE pHandle, DWORD addr, string* name) {
 	char buf[50];
-	if (!ReadProcessMemory(pHandle, (LPCVOID)addr, buf, 50, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(addr), buf, 50, NULL)) {
 		cout << "Error by reading real player name - code : " << GetLastError() << endl;
 		out << "Error by reading real player name - code : " << GetLastError() << endl;
 	}
@@ -637,9 +493,10 @@ BOOL setPlayedPlayers(HANDLE pHandle, DWORD addr, int* playedPlayersHome, int* p
 	int i = 0;
 	__int8* buf = new __int8[maxOfPlayedPlayers];
 	DWORD offset = 0x12;
-	if (!ReadProcessMemory(pHandle, (LPCVOID)addr, buf, maxOfPlayedPlayers, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(addr), buf, maxOfPlayedPlayers, NULL)) {
 		cout << "Error by reading home played players - code : " << GetLastError() << endl;
 		out << "Error by reading home played players - code : " << GetLastError() << endl;
+		delete[] buf;
 		return false;
 	}
 	int playedPlayersHomeCount = 0;
@@ -647,6 +504,7 @@ BOOL setPlayedPlayers(HANDLE pHandle, DWORD addr, int* playedPlayersHome, int* p
 		if (buf[i] > maxOfRosterPlayers - 1 || buf[i] < notPlayed) {
 			cout << "Value damaged " << buf[i] << endl;
 			out << "Value damaged " << buf[i] << endl;
+			delete[] buf;
 			return false;
 		}
 		if (buf[i] != notPlayed) {
@@ -657,11 +515,13 @@ BOOL setPlayedPlayers(HANDLE pHandle, DWORD addr, int* playedPlayersHome, int* p
 	if (playedPlayersHomeCount < 11) {
 		cout << "Home pLayers on a field less than 11 - " << playedPlayersHomeCount << endl;
 		out << "Home pLayers on a field less than 11 - " << playedPlayersHomeCount << endl;
+		delete[] buf;
 		return false;
 	}
-	if (!ReadProcessMemory(pHandle, (LPCVOID)(addr + offset), buf, maxOfPlayedPlayers, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(addr + offset), buf, maxOfPlayedPlayers, NULL)) {
 		cout << "Error by reading guest played players - code : " << GetLastError() << endl;
 		out << "Error by reading guest played players - code : " << GetLastError() << endl;
+		delete[] buf;
 		return false;
 	}
 	int playedPlayersGuestCount = 0;
@@ -669,6 +529,7 @@ BOOL setPlayedPlayers(HANDLE pHandle, DWORD addr, int* playedPlayersHome, int* p
 		if (buf[i] > maxOfRosterPlayers || buf[i] < notPlayed) {
 			cout << "Value damaged " << buf[i] <<endl;
 			out << "Value damaged " << buf[i] << endl;
+			delete[] buf;
 			return false;
 		}
 		if (buf[i] != notPlayed) {
@@ -679,15 +540,17 @@ BOOL setPlayedPlayers(HANDLE pHandle, DWORD addr, int* playedPlayersHome, int* p
 	if (playedPlayersGuestCount < 11) {
 		cout << "Guest pLayers on a field less than 11 - " << playedPlayersGuestCount << endl;
 		out << "Guest pLayers on a field less than 11 - " << playedPlayersGuestCount << endl;
+		delete[] buf;
 		return false;
 	}
+	delete[] buf;
 	return true;
 }
 
 BOOL setPlayers(HANDLE pHandle, DWORD addr, __int16* arr) {
 	__int16 buf[32];
 	int maxOfRosterPlayers = MAX_OF_ROSTER_PLAYERS;
-	if (!ReadProcessMemory(pHandle, (LPCVOID)addr, buf, maxOfRosterPlayers * 2, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(addr), buf, maxOfRosterPlayers * 2, NULL)) {
 		cout << "Error by reading team players - code : " << GetLastError() << endl;
 		out << "Error by reading team players - code : " << GetLastError() << endl;
 		return false;
@@ -712,7 +575,7 @@ void setPlayersNames(HANDLE pHandle, DWORD baseAddr, string* arr) {
 	DWORD addr;
 	for (int i = 0; i < maxOfRosterPlayers; i++) {
 		addr = baseAddr + i * offset;
-		if (!ReadProcessMemory(pHandle, (LPCVOID)addr, buf, maxNameLength, NULL)) {
+		if (!ReadProcessMemory(pHandle, ToAddress(addr), buf, maxNameLength, NULL)) {
 			cout << "Error by reading team players - code : " << GetLastError() << endl;
 			out << "Error by reading team players - code : " << GetLastError() << endl;
 		}
@@ -724,11 +587,12 @@ void setPlayersNames(HANDLE pHandle, DWORD baseAddr, string* arr) {
 		}
 		arr[i] = string(buf);
 	}
+	delete[] buf;
 }
 
 BOOL setTeamScore(HANDLE pHandle, DWORD addr, int* dst) {
 	__int8 buf;
-	if (!ReadProcessMemory(pHandle, (LPCVOID)addr, &buf, 1, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(addr), &buf, 1, NULL)) {
 		cout << "Error by reading team score - code : " << GetLastError() << endl;
 		out << "Error by reading team score - code : " << GetLastError() << endl;
 	}
@@ -741,7 +605,7 @@ BOOL setTeamScore(HANDLE pHandle, DWORD addr, int* dst) {
 
 BOOL setTeamExtraTimeScore(HANDLE pHandle, DWORD half1addr, DWORD half2addr, int* dst) {
 	__int8 buf;
-	if (!ReadProcessMemory(pHandle, (LPCVOID)half1addr, &buf, 1, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(half1addr), &buf, 1, NULL)) {
 		cout << "Error by reading team extra time score - code : " << GetLastError() << endl;
 		out << "Error by reading team extra time score - code : " << GetLastError() << endl;
 	}
@@ -749,7 +613,7 @@ BOOL setTeamExtraTimeScore(HANDLE pHandle, DWORD half1addr, DWORD half2addr, int
 		return false;
 	}
 	*dst = (int)buf;
-	if (!ReadProcessMemory(pHandle, (LPCVOID)half2addr, &buf, 1, NULL)) {
+	if (!ReadProcessMemory(pHandle, ToAddress(half2addr), &buf, 1, NULL)) {
 		cout << "Error by reading team score - code : " << GetLastError() << endl;
 		out << "Error by reading team score - code : " << GetLastError() << endl;
 	}
@@ -772,7 +636,7 @@ void setPlayersDribbleDistances(HANDLE pHandle, DWORD baseAddr, int* arr, int* p
 			continue;
 		}
 		addr = baseAddr + i * offset;
-		if (!ReadProcessMemory(pHandle, (LPCVOID)addr, &val, sizeof(float), NULL)) {
+		if (!ReadProcessMemory(pHandle, ToAddress(addr), &val, sizeof(float), NULL)) {
 			cout << "Error by reading players stats - code : " << GetLastError() << endl;
 			out << "Error by reading players stats - code : " << GetLastError() << endl;
 			return;
@@ -792,7 +656,7 @@ void setPlayersStatsOffset68(HANDLE pHandle, DWORD baseAddr, int* arr, int* play
 			continue;
 		}
 		addr = baseAddr + i * offset;
-		if (!ReadProcessMemory(pHandle, (LPCVOID)addr, &val, 1, NULL)) {
+		if (!ReadProcessMemory(pHandle, ToAddress(addr), &val, 1, NULL)) {
 			cout << "Error by reading players stats - code : " << GetLastError() << endl;
 			out << "Error by reading players stats - code : " << GetLastError() << endl;
 			return;
@@ -812,7 +676,7 @@ void setPlayersInjuries(HANDLE pHandle, DWORD baseAddr, int* arr, int* playedPla
 			continue;
 		}
 		addr = baseAddr + i * offset;
-		if (!ReadProcessMemory(pHandle, (LPCVOID)addr, &val, 2, NULL)) {
+		if (!ReadProcessMemory(pHandle, ToAddress(addr), &val, 2, NULL)) {
 			cout << "Error by reading players injuries - code : " << GetLastError() << endl;
 			out << "Error by reading players injuries - code : " << GetLastError() << endl;
 			return;
@@ -844,12 +708,13 @@ void print(int* arr, int len) {
 
 string currentDateTime() {
 	time_t now = time(0);
-	struct tm tstruct;
-	char* buf = new char[80];
-	tstruct = *localtime(&now);
-	strftime(buf, 80*sizeof(char), "%Y-%m-%d %H-%M-%S", &tstruct);
-	string str(buf);
-	return str;
+	struct tm timeinfo;
+	char buf[80];
+	
+	localtime_s(&timeinfo, &now);
+	strftime(buf, sizeof(buf), "%Y-%m-%d %H-%M-%S", &timeinfo);
+	
+	return string(buf);
 }
 
 HANDLE OpenProcessByName(LPCTSTR name, DWORD dwAccess)
